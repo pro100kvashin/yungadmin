@@ -1,0 +1,68 @@
+---
+- hosts: localhost
+
+  tasks:
+   - name: Get ansible date/time facts
+     setup:
+       filter: "ansible_date_time"
+       gather_subset: "!all"
+
+   - name: Store DTG as fact
+     set_fact:
+       DTG: "{{ ansible_date_time.date }}"
+
+   - name: Create Directory {{hostvars.localhost.DTG}}
+     file:
+      path: /etc/ansible/playbook/backup-switch/{{hostvars.localhost.DTG}}
+      state: directory
+  run_once: true
+
+
+- hosts: cisco-switch
+#  become: yes
+#  become_user:
+#  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: timestamp init
+      shell: "date +%Y-%m-%d"
+      register: tstamp
+    - name: login and show run
+      telnet:
+       user: "{{ username }}"
+       password: "{{ password }}"
+       login_prompt: "Username: "
+       prompts:
+         - '[>|#]'
+       command:
+          - "enable\n{{ enable_password }}"
+          - terminal length 0
+          - show running-config
+
+#       become: yes
+#          - terminal length 0
+#          - show run
+      register: configrun
+      ignore_errors: yes
+#   - name: Save output to ~/network-programmability/backups-switch/
+#     copy:
+#       content: "{{config.stdout[0]}}"
+#       dest: "~/network-programmability/backups/{{hostvars.localhost.DTG}}/{{inventory_hostname}}-{{hostvars.localhost.DTG}}-config.txt"
+
+
+    - name: download config to file
+      copy:
+       content: "{{ configrun }}"
+       dest: "/etc/ansible/playbook/backup-switch/{{ tstamp.stdout }}_{{ inventory_hostname }}-config.txt"
+
+
+    - name: remove unused char
+      command: /bin/sed -i 's!\\r\\n!\n!g' /etc/ansible/playbook/backup-switch/{{ tstamp.stdout }}_{{ inventory_hostname }}-config.txt
+    - name: remove unused header and footer
+      command: /bin/sed -i '1,2d;$d' /etc/ansible/playbook/backup-switch/{{ tstamp.stdout }}_{{ inventory_hostname }}-config.txt
+#   - name: get hostname from file config
+#     shell: "/bin/cat /etc/ansible/playbook/backup/{{ tstamp.stdout }}_{{ inventory_hostname }}.txt | grep hostname | awk -F' ' '{print $2}'"
+#     register: get_hostname
+#   - name: rename file config
+#     shell: "/bin/mv /etc/ansible/playbook/backup/{{ tstamp.stdout }}_{{ inventory_hostname }}.txt /etc/ansible/playbook/backup/{{ tstamp.stdout }}_{{ get_hostname.stdout }}.txt"
