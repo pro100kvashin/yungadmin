@@ -27,7 +27,7 @@
        commands:
          - command: "enable\n"
            prompt: 'Password:'
-           answer: "EnLo$82Dz"
+           answer: ""
      register: enable
 
    - name: Cisco Backup Config
